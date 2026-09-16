@@ -409,6 +409,59 @@ kill -s INT $CPU_PID $MEM_PID
 </details>
 
 <details markdown="1">
+  <summary>Boltz on 8 H100 GPUs</summary>
+
+```
+#!/bin/bash
+#SBATCH -J boltz
+#SBATCH -A siyoungk
+#SBATCH -p ai
+#SBATCH -N 1
+#SBATCH -n 1          # one task: boltz starts one process per GPU itself
+#SBATCH -c 112        # all of the node's cores for that task
+#SBATCH --exclusive
+#SBATCH --gres=gpu:8
+#SBATCH -t 4:00:00
+
+# Each Gautschi-H node has
+# 8 × H100 GPUs
+# 2 × Intel Xeon Platinum 8480+
+# 112 CPU cores total (56 cores × 2)
+# sbatch *.sub
+
+module load monitor
+module load conda/2026.03
+conda activate boltz
+
+hostname
+
+# track per-code CPU load
+monitor cpu percent --all-cores >cpu-percent.log &
+CPU_PID=$!
+
+# track memory usage
+monitor cpu memory >cpu-memory.log &
+MEM_PID=$!
+
+# actual code
+# Lightning assumes srun started one process per GPU in any SLURM job.
+# Boltz starts its own, so hide the task count from Lightning.
+unset SLURM_NTASKS
+boltz pointprobe input.yaml \
+    --model boltz1 \
+    --out_dir boltz \
+    --diffusion_samples 5 \
+    --output_format mae \
+    --devices 8 \
+    --preprocessing-threads 1 \
+    --use_potentials --use_msa_server
+
+# shut down the resource monitors
+kill -s INT $CPU_PID $MEM_PID
+```
+</details>
+
+<details markdown="1">
  <summary>Boltz on Lilac with 1 A100 GPU </summary>
 
 ```
